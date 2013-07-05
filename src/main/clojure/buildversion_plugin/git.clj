@@ -30,6 +30,17 @@
          (throw (RuntimeException.
                  (str "Execution of Git command failed: " stderr)))))))
 
+(defn git-dirty-repo [dir]
+  (let [dirty (-> (run-git-wait dir ["describe" "--always" "--dirty"])
+                  trim-newline)]
+    (if
+      (= nil (re-matches #".*-dirty" dirty))
+      "false"
+      "true"
+    )
+  )
+)
+
 (defn git-describe-log-lines [log-lines-seq]
   "Given a seq of \"git log\" output lines, return map with :git-tag (most recent
   tag) and :git-tag-delta (number of commits to reach it)"
@@ -76,15 +87,17 @@
           versioning-properties {:build-tag "N/A"
                                  :build-version "N/A"
                                  :build-tag-delta "0"
+                                 :build-dirty (git-dirty-repo dir)
                                  :build-tstamp commit-tstamp-str
+                                 :build-unixtime (format "%d" (/ (.getTime commit-tstamp) 1000))
                                  :build-commit long-hash
                                  :build-commit-abbrev short-hash }
-          
+
           {:keys [git-tag git-tag-delta] } (git-describe-first-parent dir)]
 
       (if (nil? git-tag)
         versioning-properties
-        
+
         (let [maven-artifact-version ((re-find #"v(.*)" git-tag) 1)]
           (merge versioning-properties
                  {:build-tag maven-artifact-version
